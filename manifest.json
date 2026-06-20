@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "M3U8 下載器",
+  "version": "1.0.0",
+  "description": "自動偵測網頁中的 m3u8 影音串流，以串流直寫方式下載為 .ts 檔案。以擴充功能的權限存取串流，不受一般網頁的 CORS 限制。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "M3U8 下載器"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "webRequest",
+    "tabs",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
