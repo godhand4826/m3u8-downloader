@@ -98,12 +98,12 @@ async function setRefererRule(refererUrl) {
   return { ok: true };
 }
 
-// ── Manage Tab 感知 ───────────────────────────────────────────────────────────
-// 追蹤連線中的 manage.html tab，用於防止重複開啟導致任務中斷
+// ── TaskManager Tab 感知 ──────────────────────────────────────────────────────
+// 追蹤連線中的 taskManager.html tab，用於防止重複開啟導致任務中斷
 const connectedPorts = new Set();
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'manage-page') return;
+  if (port.name !== 'taskManager-page') return;
   connectedPorts.add(port);
   port.onDisconnect.addListener(() => connectedPorts.delete(port));
   // 告知新連線的 tab 是否已有其他 tab 存在

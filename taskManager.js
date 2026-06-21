@@ -1,7 +1,7 @@
-// manage.js
+// taskManager.js
 
 // ── SW Port（僅用於 tab 感知，任務狀態完全在本頁管理） ───────────────────────
-const port = chrome.runtime.connect({ name: 'manage-page' });
+const port = chrome.runtime.connect({ name: 'taskManager-page' });
 
 port.onMessage.addListener((msg) => {
   if (msg.type === 'INIT' && msg.hasOtherTabs) {
@@ -494,12 +494,12 @@ async function fetchText(url) {
 
 // ── 工具 ──────────────────────────────────────────────────────────────────────
 async function redirectToExistingTab() {
-  const manageUrl = chrome.runtime.getURL('manage.html');
+  const taskManagerUrl = chrome.runtime.getURL('taskManager.html');
   const [currentTab, allTabs] = await Promise.all([
     chrome.tabs.getCurrent(),
     chrome.tabs.query({}),
   ]);
-  const other = allTabs.find(t => t.url?.startsWith(manageUrl) && t.id !== currentTab?.id);
+  const other = allTabs.find(t => t.url?.startsWith(taskManagerUrl) && t.id !== currentTab?.id);
   if (other) {
     chrome.tabs.update(other.id, { active: true });
     try { chrome.windows.update(other.windowId, { focused: true }); } catch { /**/ }
@@ -520,7 +520,7 @@ function hideBanner(el) { el.classList.remove('show'); }
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'NEW_STREAM') {
+  if (msg?.type === 'NEW_TASK') {
     openAddPanel(msg.streamUrl, msg.referer || '');
     doParse();
   }
