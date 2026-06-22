@@ -7,26 +7,8 @@ function truncateUrl(url, max) {
   return head + '…' + tail;
 }
 
-// 若 taskManager.html 已開啟則切換至該 tab（並視需要傳送串流資訊）；否則開新 tab
-// tabs.query 的 url 做精確比對，無法配對帶有 query string 的 tab（如 taskManager.html?src=...），
-// 改用 startsWith 過濾所有 tab。
-async function openTaskManagerPage(url = '', pageUrl = '') {
-  const taskManagerUrl = chrome.runtime.getURL('taskManager.html');
-  const allTabs = await chrome.tabs.query({});
-  const tabs = allTabs.filter(t => t.url?.startsWith(taskManagerUrl));
-  if (tabs.length > 0) {
-    const tab = tabs[0];
-    await chrome.tabs.update(tab.id, { active: true });
-    try { await chrome.windows.update(tab.windowId, { focused: true }); } catch { /* 跨無痕視窗限制，忽略 */ }
-    if (url) chrome.tabs.sendMessage(tab.id, { type: 'NEW_TASK', streamUrl: url, referer: pageUrl || '' });
-  } else {
-    let target = taskManagerUrl;
-    if (url) {
-      target += '?src=' + encodeURIComponent(url);
-      if (pageUrl) target += '&ref=' + encodeURIComponent(pageUrl);
-    }
-    chrome.tabs.create({ url: target });
-  }
+function openTaskManagerPage(url = '', pageUrl = '') {
+  chrome.runtime.sendMessage({ type: 'OPEN_TASK_MANAGER', url, referer: pageUrl });
 }
 
 function renderStreams(streams) {
@@ -76,8 +58,8 @@ async function init() {
   });
 }
 
-document.getElementById('manage-btn').addEventListener('click', async () => {
-  await openTaskManagerPage();
+document.getElementById('manage-btn').addEventListener('click', () => {
+  openTaskManagerPage();
   window.close();
 });
 

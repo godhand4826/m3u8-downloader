@@ -1,14 +1,5 @@
 // taskManager.js
 
-// ── SW Port（僅用於 tab 感知，任務狀態完全在本頁管理） ───────────────────────
-const port = chrome.runtime.connect({ name: 'taskManager-page' });
-
-port.onMessage.addListener((msg) => {
-  if (msg.type === 'INIT' && msg.hasOtherTabs) {
-    redirectToExistingTab();
-  }
-});
-
 // ── 任務狀態 ──────────────────────────────────────────────────────────────────
 // id -> { id, filename, streamUrl, referer, status, written, total, error,
 //          fileHandle, segments, cancelCtrl }
@@ -493,20 +484,6 @@ async function fetchText(url) {
 }
 
 // ── 工具 ──────────────────────────────────────────────────────────────────────
-async function redirectToExistingTab() {
-  const taskManagerUrl = chrome.runtime.getURL('taskManager.html');
-  const [currentTab, allTabs] = await Promise.all([
-    chrome.tabs.getCurrent(),
-    chrome.tabs.query({}),
-  ]);
-  const other = allTabs.find(t => t.url?.startsWith(taskManagerUrl) && t.id !== currentTab?.id);
-  if (other) {
-    chrome.tabs.update(other.id, { active: true });
-    try { chrome.windows.update(other.windowId, { focused: true }); } catch { /**/ }
-  }
-  window.close();
-}
-
 function truncUrl(url, max = 55) {
   if (!url || url.length <= max) return url;
   return url.slice(0, Math.ceil(max * 0.6)) + '…' + url.slice(-Math.floor(max * 0.35));
@@ -519,6 +496,7 @@ function showBanner(el, msg, kind = 'warn') {
 function hideBanner(el) { el.classList.remove('show'); }
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
+// 處理已存在的 tab 被 SW push 進來新任務的情況
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'NEW_TASK') {
     openAddPanel(msg.streamUrl, msg.referer || '');
@@ -526,12 +504,11 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-function init() {
-  const params = new URLSearchParams(location.search);
-  const src = params.get('src');
-  if (src) {
-    history.replaceState(null, '', location.pathname);
-    openAddPanel(src, params.get('ref') || '');
+async function init() {
+  const resp = await chrome.runtime.sendMessage({ type: 'INIT_TASK_MANAGER' });
+  if (resp?.duplicate) return; // SW 會關掉這個 tab
+  if (resp?.url) {
+    openAddPanel(resp.url, resp.referer || '');
     doParse();
   }
 }

@@ -98,23 +98,27 @@ async function setRefererRule(refererUrl) {
   return { ok: true };
 }
 
-// ── TaskManager Tab 感知 ──────────────────────────────────────────────────────
-// 追蹤連線中的 taskManager.html tab，用於防止重複開啟導致任務中斷
-const connectedPorts = new Set();
+// ── TaskManager Tab 管理 ─────────────────────────────────────────────────────
+let pendingTask = null;
 
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'taskManager-page') return;
-  connectedPorts.add(port);
-  port.onDisconnect.addListener(() => connectedPorts.delete(port));
-  // 告知新連線的 tab 是否已有其他 tab 存在
-  port.postMessage({ type: 'INIT', hasOtherTabs: connectedPorts.size > 1 });
-});
+function getTaskManagerUrl() {
+  return chrome.runtime.getURL('taskManager.html');
+}
+
+async function findTaskManagerTab() {
+  const url = getTaskManagerUrl();
+  const allTabs = await chrome.tabs.query({});
+  return allTabs.find(t => t.url?.startsWith(url)) ?? null;
+}
+
+async function focusTab(tab) {
+  await chrome.tabs.update(tab.id, { active: true });
+  try { await chrome.windows.update(tab.windowId, { focused: true }); } catch { /* 跨無痕視窗限制，忽略 */ }
+}
 
 // ── 訊息處理 ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg) {
-    return;
-  }
+  if (!msg) return;
 
   if (msg.type === 'GET_STREAMS') {
     const m = tabStreams.get(msg.tabId);
@@ -124,6 +128,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'SET_REFERER') {
     setRefererRule(msg.referer).then(sendResponse);
-    return true; // to keep sendResponse valid for async response
+    return true;
+  }
+
+  if (msg.type === 'OPEN_TASK_MANAGER') {
+    findTaskManagerTab().then(async (tab) => {
+      if (tab) {
+        await focusTab(tab);
+        if (msg.url) chrome.tabs.sendMessage(tab.id, { type: 'NEW_TASK', streamUrl: msg.url, referer: msg.referer || '' });
+      } else {
+        if (msg.url) pendingTask = { url: msg.url, referer: msg.referer || '' };
+        chrome.tabs.create({ url: getTaskManagerUrl() });
+      }
+    });
+    return;
+  }
+
+  if (msg.type === 'INIT_TASK_MANAGER') {
+    const url = getTaskManagerUrl();
+    chrome.tabs.query({}, (allTabs) => {
+      const others = allTabs.filter(t => t.url?.startsWith(url) && t.id !== sender.tab.id);
+      if (others.length > 0) {
+        focusTab(others[0]);
+        chrome.tabs.remove(sender.tab.id);
+        sendResponse({ duplicate: true });
+      } else {
+        sendResponse(pendingTask ?? {});
+        pendingTask = null;
+      }
+    });
+    return true;
   }
 });
