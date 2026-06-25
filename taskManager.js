@@ -348,7 +348,6 @@ async function streamToFile(task) {
   const writable = await fileHandle.createWritable();
   const pending = new Map();
   let nextToWrite = 0;
-  let lastPct = -1;
 
   async function flush() {
     while (pending.has(nextToWrite)) {
@@ -356,9 +355,7 @@ async function streamToFile(task) {
       await writable.write(pending.get(nextToWrite));
       pending.delete(nextToWrite);
       task.written = ++nextToWrite;
-      // 每 1% 更新一次畫面
-      const pct = Math.floor(task.written / segments.length * 100);
-      if (pct !== lastPct) { lastPct = pct; scheduleRender(); }
+      scheduleRender();
     }
   }
 
